@@ -1,6 +1,0 @@
-flask
-qdrant-client
-python-dotenv
-transformers
-torch
-Pillow

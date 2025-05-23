@@ -1,3 +1,25 @@
+
+import streamlit as st
+from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+import gc
+import psutil
+
+# Show memory usage in sidebar
+mem = psutil.Process().memory_info().rss / (1024 * 1024)
+st.sidebar.markdown(f"**🔋 Memory Usage:** `{mem:.2f} MB`")
+
+# Auto-clear memory to avoid leaks
+gc.collect()
+
+# Use smaller, memory-efficient model
+@st.cache_resource
+def load_model():
+    return SentenceTransformer('paraphrase-MiniLM-L3-v2')  # ~80MB model
+
+@st.cache_resource
+def get_qdrant_client():
+    return QdrantClient(path="qdrant_data")  # Adjust path/config as needed
 import streamlit as st
 from sentence_transformers import SentenceTransformer, util
 import numpy as np

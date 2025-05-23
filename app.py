@@ -1,74 +1,74 @@
-
 import streamlit as st
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
+from qdrant_client.models import VectorParams, Distance, PointStruct, SearchParams
+import numpy as np
+import matplotlib.pyplot as plt
 import gc
-import psutil
 
-# Show memory usage in sidebar
-mem = psutil.Process().memory_info().rss / (1024 * 1024)
-st.sidebar.markdown(f"**🔋 Memory Usage:** `{mem:.2f} MB`")
+# ------------------------ CONFIG ------------------------ #
+st.set_page_config(page_title="Semantic Search App", layout="wide")
+st.title("🔍 Real-Time Semantic Search (Streamlit + Qdrant)")
 
-# Auto-clear memory to avoid leaks
-gc.collect()
-
-# Use smaller, memory-efficient model
+# ------------------------ CACHED RESOURCES ------------------------ #
 @st.cache_resource
 def load_model():
-    return SentenceTransformer('paraphrase-MiniLM-L3-v2')  # ~80MB model
+    return SentenceTransformer("paraphrase-MiniLM-L3-v2")
 
 @st.cache_resource
 def get_qdrant_client():
-    return QdrantClient(path="qdrant_data")  # Adjust path/config as needed
-import streamlit as st
-from sentence_transformers import SentenceTransformer, util
-import numpy as np
-import pandas as pd
+    client = QdrantClient(":memory:")  # In-memory DB, no external API
+    client.recreate_collection(
+        collection_name="my_collection",
+        vectors_config=VectorParams(size=384, distance=Distance.COSINE),
+    )
+    return client
 
-# ---------- MODEL LOADING ---------- #
-@st.cache_resource(show_spinner="🔄 Loading the model. Please wait...")
-def load_model():
-    return SentenceTransformer('paraphrase-MiniLM-L3-v2')
+model = load_model()
+qdrant = get_qdrant_client()
 
+# ------------------------ ADD DOCUMENTS ------------------------ #
+st.subheader("📄 Add Your Documents")
+docs = st.text_area("Enter documents (one per line):", height=150)
 
+if st.button("Embed Documents"):
+    if docs.strip():
+        lines = [d.strip() for d in docs.strip().split("\n") if d.strip()]
+        embeddings = model.encode(lines).tolist()
+        points = [PointStruct(id=i, vector=vec, payload={"text": lines[i]}) for i, vec in enumerate(embeddings)]
+        qdrant.upsert(collection_name="my_collection", points=points)
+        st.success("✅ Documents embedded and stored in memory!")
+        gc.collect()
 
-# ---------- EMBEDDING FUNCTION ---------- #
-def embed_documents(model, documents):
-    embeddings = model.encode(documents, convert_to_tensor=True)
-    return embeddings
+# ------------------------ QUERY SEARCH ------------------------ #
+st.subheader("🔎 Semantic Search")
+query = st.text_input("Enter your search query:")
 
+if st.button("Search"):
+    if query.strip():
+        query_embedding = model.encode(query).tolist()
+        hits = qdrant.search(
+            collection_name="my_collection",
+            query_vector=query_embedding,
+            limit=5,
+            search_params=SearchParams(hnsw_ef=64, exact=False)
+        )
 
-# ---------- MAIN APP ---------- #
-def main():
-    st.set_page_config(page_title="Semantic Search App", layout="centered")
-    st.title("📚 Semantic Text Search")
+        if hits:
+            st.markdown("### 🔍 Top Matches")
+            for hit in hits:
+                st.markdown(f"**Score:** {hit.score:.4f} — `{hit.payload['text']}`")
 
-    model = load_model()
-    st.success("✅ Model loaded successfully!")
+            # Optional: show similarity chart
+            st.subheader("📊 Similarity Scores")
+            scores = [hit.score for hit in hits]
+            labels = [f"Doc {i+1}" for i in range(len(hits))]
+            fig, ax = plt.subplots()
+            ax.barh(labels, scores, color="skyblue")
+            ax.invert_yaxis()
+            ax.set_xlabel("Cosine Similarity")
+            st.pyplot(fig)
 
-    # Text input for documents
-    st.subheader("Add Documents:")
-    document_input = st.text_area("Enter your documents (one per line):", height=200)
-    documents = [doc.strip() for doc in document_input.split('\n') if doc.strip()]
-
-    # Query input
-    st.subheader("Search Query:")
-    query = st.text_input("Enter your query:")
-
-    if st.button("Search") and query and documents:
-        with st.spinner("🔍 Searching..."):
-            doc_embeddings = embed_documents(model, documents)
-            query_embedding = model.encode(query, convert_to_tensor=True)
-
-            scores = util.pytorch_cos_sim(query_embedding, doc_embeddings)[0]
-            top_k = min(5, len(documents))
-            top_results = torch.topk(scores, k=top_k)
-
-            st.subheader("🔎 Top Matches:")
-            for score, idx in zip(top_results[0], top_results[1]):
-                st.markdown(f"**{documents[idx]}** — Similarity: `{score.item():.4f}`")
-
-
-# ---------- MAIN CALL ---------- #
-if __name__ == '__main__':
-    main()
+        else:
+            st.warning("❗ No matches found.")
+        gc.collect()

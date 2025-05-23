@@ -159,3 +159,10 @@ if st.session_state.queries:
     with st.expander("🧠 Query History"):
         for q in reversed(st.session_state.queries):
             st.write(f"• {q}")
+
+import os
+port = int(os.environ.get("PORT", 8501))
+
+import streamlit.web.bootstrap
+streamlit.web.bootstrap.run("app.py", "", [], None, port=port)
+

@@ -6,7 +6,8 @@ import pandas as pd
 # ---------- MODEL LOADING ---------- #
 @st.cache_resource(show_spinner="🔄 Loading the model. Please wait...")
 def load_model():
-    return SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    return SentenceTransformer('paraphrase-MiniLM-L3-v2')
+
 
 
 # ---------- EMBEDDING FUNCTION ---------- #

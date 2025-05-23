@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
 
-# --- Page Config (Must be first) ---
+# --- Page Config ---
 st.set_page_config(
     page_title="Semantic Search Demo",
     page_icon="🔍",
@@ -24,16 +24,14 @@ st.markdown("""
         border-radius: 10px;
         padding: 8px;
     }
-    /* Background image styling */
     .stApp {
         background-image: url('https://designimages.appypie.com/allimages/appbackground60.webp');
         background-size: cover;
         background-attachment: fixed;
         background-position: center;
     }
-    /* Style for the content container */
     .block-container {
-        background-color: rgba(255, 255, 255, 0.8); /* White background with opacity */
+        background-color: rgba(255, 255, 255, 0.8);
         border-radius: 15px;
         padding: 3rem;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
@@ -41,17 +39,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Initialize model and Qdrant ---
+# --- Load Model (Smaller for memory efficiency) ---
 @st.cache_resource
 def load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
+    return SentenceTransformer("paraphrase-MiniLM-L3-v2")
 
-@st.cache_resource
+# --- Initialize Qdrant (do NOT cache memory version) ---
 def init_qdrant():
     client = QdrantClient(":memory:")
     collection_name = "text_search"
-    
-    # (Re)create collection
+
     if client.collection_exists(collection_name):
         client.delete_collection(collection_name)
 
@@ -64,7 +61,7 @@ def init_qdrant():
 model = load_model()
 client, collection_name = init_qdrant()
 
-# --- Default corpus ---
+# --- Insert Default Texts ---
 default_texts = [
     "Who is German and likes bread?",
     "Everyone in Germany.",
@@ -72,7 +69,6 @@ default_texts = [
     "Italy is famous for pizza."
 ]
 
-# Insert default texts
 def insert_texts(texts):
     embeddings = model.encode(texts, convert_to_numpy=True)
     for text, vector in zip(texts, embeddings):
@@ -90,40 +86,48 @@ insert_texts(default_texts)
 # --- Sidebar ---
 with st.sidebar:
     st.title("⚙ Settings")
-    st.markdown("This app uses [Qdrant](https://qdrant.tech) and [Sentence Transformers](https://www.sbert.net/) to perform semantic similarity search.")
+    st.markdown("This app uses [Qdrant](https://qdrant.tech) and [Sentence Transformers](https://www.sbert.net/).")
     st.markdown("🔄 Add custom documents and search similar texts.")
     st.divider()
     st.info("Built by Bhavishya for SDP Viva")
+
+# --- Session State: Limit Queries to Avoid RAM Overuse ---
+MAX_QUERIES = 20
+if 'queries' not in st.session_state:
+    st.session_state.queries = []
 
 # --- Main Interface ---
 st.title("🔍 Semantic Search App")
 st.subheader("🔎 Real-time search with semantic understanding")
 
-# Session state for query history
-if 'queries' not in st.session_state:
-    st.session_state.queries = []
-
-# --- Custom Document Input ---
+# --- Add Custom Document ---
 with st.expander("📄 Add Custom Document"):
     document = st.text_area("Enter your custom document here:")
     if st.button("➕ Add to Knowledge Base"):
         if document:
-            doc_embedding = model.encode([document], convert_to_numpy=True)[0]
-            client.upsert(
-                collection_name=collection_name,
-                points=[PointStruct(
-                    id=uuid.uuid4().int >> 64,
-                    vector=doc_embedding.tolist(),
-                    payload={"text": document}
-                )]
-            )
-            st.success("✅ Document added successfully!")
+            # Avoid duplicates
+            existing_payloads = client.scroll(collection_name=collection_name, limit=100)[0]
+            if document not in [p.payload['text'] for p in existing_payloads]:
+                doc_embedding = model.encode([document], convert_to_numpy=True)[0]
+                client.upsert(
+                    collection_name=collection_name,
+                    points=[PointStruct(
+                        id=uuid.uuid4().int >> 64,
+                        vector=doc_embedding.tolist(),
+                        payload={"text": document}
+                    )]
+                )
+                st.success("✅ Document added successfully!")
+            else:
+                st.warning("⚠️ Document already exists.")
 
 # --- Query Search ---
 query = st.text_input("Type your search query here 👇")
 
 if query:
     st.session_state.queries.append(query)
+    st.session_state.queries = st.session_state.queries[-MAX_QUERIES:]
+
     query_embedding = model.encode([query], convert_to_numpy=True)[0]
     results = client.search(
         collection_name=collection_name,
@@ -140,7 +144,7 @@ if query:
         st.caption(f"Similarity: {res.score:.4f}")
         st.markdown("---")
 
-    # --- Chart Visualization ---
+    # --- Bar Chart for Similarity Scores ---
     st.markdown("### 📊 Similarity Scores Visualization")
     fig, ax = plt.subplots()
     bars = ax.barh(documents[::-1], similarity_scores[::-1], color="#5dade2")
@@ -148,9 +152,10 @@ if query:
     ax.set_xlim(0, 1)
     ax.set_title("Top Matching Documents")
     st.pyplot(fig)
+    plt.close(fig)  # 🧠 Free up memory
 
-# --- Query Evolution ---
+# --- Show Query History ---
 if st.session_state.queries:
     with st.expander("🧠 Query History"):
-        for q in reversed(st.session_state.queries[-5:]):
-            st.write(f"• {q}")
+        for q in reversed(st.session_state.queries):
+            st.write(f"• {q}")

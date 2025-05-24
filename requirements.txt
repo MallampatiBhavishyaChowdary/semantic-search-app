@@ -1,5 +1,5 @@
 streamlit
-sentence-transformers
-qdrant-client
-torch
 matplotlib
+sentence-transformers==2.2.2
+huggingface-hub==0.16.4
+qdrant-client

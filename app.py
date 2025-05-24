@@ -209,4 +209,3 @@ if st.session_state.queries:
     with st.expander("🧠 Query History"):
         for q in reversed(st.session_state.queries[-5:]):
             st.write(f"• {q}")
- so iam writing documentation

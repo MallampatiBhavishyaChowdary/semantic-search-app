@@ -4,4 +4,8 @@ sentence-transformers==2.2.2
 qdrant-client==1.8.0
 matplotlib==3.7.1
 numpy==1.24.4
+pygments==2.19.1
+mdurl==0.1.2
+markdown-it-py==3.0.0
+rich==14.0.0
 

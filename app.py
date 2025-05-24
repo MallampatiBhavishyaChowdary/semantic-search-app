@@ -91,7 +91,7 @@ with st.sidebar:
     st.markdown("This app uses [Qdrant](https://qdrant.tech) and [Sentence Transformers](https://www.sbert.net/) to perform semantic similarity search.")
     st.markdown("🔄 Add custom documents and search similar texts.")
     st.divider()
-    st.info("Built by Bhavishya for SDP Viva")
+    st.info("Built by Bhavishya")
 
 # --- Main Interface ---
 st.title("🔍 Semantic Search App")

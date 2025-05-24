@@ -42,9 +42,12 @@ st.markdown("""
 # --- Load Sentence Transformer Model ---
 @st.cache_resource
 def load_model():
-    return SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1")
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 model = load_model()
+embedding = model.encode(["test"], convert_to_numpy=True)[0]
+print(len(embedding))  # Should match the value in VectorParams
+
 
 # --- Initialize Qdrant In-Memory DB ---
 @st.cache_resource
@@ -56,8 +59,8 @@ def init_qdrant():
         client.delete_collection(collection_name)
 
     client.create_collection(
-        collection_name=collection_name,
-        vectors_config=VectorParams(size=1024, distance=Distance.COSINE)
+    collection_name=collection_name,
+    vectors_config=VectorParams(size=384, distance=Distance.COSINE)
     )
     return client, collection_name
 
@@ -91,7 +94,7 @@ with st.sidebar:
     st.markdown("This app uses [Qdrant](https://qdrant.tech) and [Sentence Transformers](https://www.sbert.net/) to perform semantic similarity search.")
     st.markdown("🔄 Add custom documents and search similar texts.")
     st.divider()
-    st.info("Built by Bhavishya for SDP Viva")
+    st.info("Built by Bhavishya ")
 
 # --- Main Interface ---
 st.title("🔍 Semantic Search App")

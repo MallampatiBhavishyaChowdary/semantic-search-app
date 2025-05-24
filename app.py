@@ -1,52 +1,154 @@
 import streamlit as st
-import numpy as np
+import uuid
+import matplotlib.pyplot as plt
+from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, VectorParams, PointStruct
 
-# --- MEMORY-EFFICIENT MODEL LOAD ---
+# --- Page Config ---
+st.set_page_config(
+    page_title="Semantic Search Demo",
+    page_icon="🔍",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- Custom Styling ---
+st.markdown("""
+    <style>
+    .main {background-color: #f4f9fd;}
+    .block-container {padding: 2rem 3rem;}
+    h1, h2, h3 {color: #003262;}
+    .stTextInput > div > div > input {
+        border: 1px solid #003262;
+        border-radius: 10px;
+        padding: 8px;
+    }
+    .stApp {
+        background-image: url('https://designimages.appypie.com/allimages/appbackground60.webp');
+        background-size: cover;
+        background-attachment: fixed;
+        background-position: center;
+    }
+    .block-container {
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 15px;
+        padding: 3rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- Load Model (Lightweight for low RAM) ---
 @st.cache_resource
 def load_model():
-    from sentence_transformers import SentenceTransformer
-    return SentenceTransformer("all-MiniLM-L6-v2")  # lightweight model
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 model = load_model()
 
-# --- SIMULATED DOCUMENT LOADING (Replace with real logic) ---
-@st.cache_data
-def load_my_documents():
-    # Simulate a few short sample docs (TEMP FIX: Limit to 5)
-    return [
-        "Streamlit is an open-source Python app framework for ML and data science.",
-        "Qdrant is a vector similarity search engine written in Rust.",
-        "SentenceTransformers make it easy to compute embeddings.",
-        "Render is a cloud provider for hosting full stack apps.",
-        "Vector search helps you find similar documents semantically.",
-        "This document won't be loaded due to limit."  # gets excluded
-    ][:5]  # Limit number of documents to stay under memory
+# --- Initialize Qdrant In-Memory DB ---
+@st.cache_resource
+def init_qdrant():
+    client = QdrantClient(":memory:")
+    collection_name = "text_search"
 
-# --- EMBEDDING FUNCTION ---
-@st.cache_data
-def embed_documents(docs):
-    return model.encode(docs, show_progress_bar=False)
+    if client.collection_exists(collection_name):
+        client.delete_collection(collection_name)
 
-# --- APP UI ---
-st.set_page_config(page_title="Semantic Search", layout="centered")
-st.title("🔍 Lightweight Semantic Search App (Render Optimized)")
+    client.create_collection(
+        collection_name=collection_name,
+        vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+    )
+    return client, collection_name
 
-docs = load_my_documents()
-doc_embeddings = embed_documents(docs)
+client, collection_name = init_qdrant()
 
-query = st.text_input("Enter your search query:")
+# --- Default Texts ---
+default_texts = [
+    "Who is German and likes bread?",
+    "Everyone in Germany.",
+    "French people love baguettes.",
+    "Italy is famous for pizza."
+]
+
+def insert_texts(texts):
+    embeddings = model.encode(texts, convert_to_numpy=True)
+    for text, vector in zip(texts, embeddings):
+        client.upsert(
+            collection_name=collection_name,
+            points=[PointStruct(
+                id=uuid.uuid4().int >> 64,
+                vector=vector.tolist(),
+                payload={"text": text}
+            )]
+        )
+
+insert_texts(default_texts)
+
+# --- Sidebar ---
+with st.sidebar:
+    st.title("⚙ Settings")
+    st.markdown("This app uses [Qdrant](https://qdrant.tech) and [Sentence Transformers](https://www.sbert.net/) to perform semantic similarity search.")
+    st.markdown("🔄 Add custom documents and search similar texts.")
+    st.divider()
+    st.info("Built by Bhavishya for SDP Viva")
+
+# --- Main Interface ---
+st.title("🔍 Semantic Search App")
+st.subheader("🔎 Real-time search with semantic understanding")
+
+# --- Session State for Query History ---
+if 'queries' not in st.session_state:
+    st.session_state.queries = []
+
+# --- Custom Document Input ---
+with st.expander("📄 Add Custom Document"):
+    document = st.text_area("Enter your custom document here:")
+    if st.button("➕ Add to Knowledge Base"):
+        if document:
+            doc_embedding = model.encode([document], convert_to_numpy=True)[0]
+            client.upsert(
+                collection_name=collection_name,
+                points=[PointStruct(
+                    id=uuid.uuid4().int >> 64,
+                    vector=doc_embedding.tolist(),
+                    payload={"text": document}
+                )]
+            )
+            st.success("✅ Document added successfully!")
+
+# --- Query Search ---
+query = st.text_input("Type your search query here 👇")
+
 if query:
-    query_embedding = model.encode([query])[0]
-
-    # Compute cosine similarity
-    scores = np.dot(doc_embeddings, query_embedding) / (
-        np.linalg.norm(doc_embeddings, axis=1) * np.linalg.norm(query_embedding) + 1e-9
+    st.session_state.queries.append(query)
+    query_embedding = model.encode([query], convert_to_numpy=True)[0]
+    results = client.search(
+        collection_name=collection_name,
+        query_vector=query_embedding.tolist(),
+        limit=5
     )
 
-    # Show top 3 results
-    top_k = 3
-    top_indices = np.argsort(scores)[::-1][:top_k]
-    st.subheader("Top Matches:")
-    for i in top_indices:
-        st.markdown(f"**Score:** {scores[i]:.2f}")
-        st.write(docs[i])
+    st.markdown("### 🔍 Top Matches:")
+    similarity_scores = [res.score for res in results]
+    documents = [res.payload["text"] for res in results]
+
+    for res in results:
+        st.markdown(f"• {res.payload['text']}")
+        st.caption(f"Similarity: {res.score:.4f}")
+        st.markdown("---")
+
+    # --- Visualization ---
+    st.markdown("### 📊 Similarity Scores Visualization")
+    fig, ax = plt.subplots()
+    ax.barh(documents[::-1], similarity_scores[::-1], color="#5dade2")
+    ax.set_xlabel("Similarity Score")
+    ax.set_xlim(0, 1)
+    ax.set_title("Top Matching Documents")
+    st.pyplot(fig)
+
+# --- Query History ---
+if st.session_state.queries:
+    with st.expander("🧠 Query History"):
+        for q in reversed(st.session_state.queries[-5:]):
+            st.write(f"• {q}")

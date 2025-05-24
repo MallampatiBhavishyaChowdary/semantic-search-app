@@ -1,11 +1,68 @@
-import streamlit as st
+%pip install transformers sentence-transformers torch             
+import uuid
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, VectorParams, PointStruct
+from sentence_transformers import SentenceTransformer                                                                       client = QdrantClient(":memory:") 
+
+collection_name = "text_search"
+
+if client.collection_exists(collection_name):
+    client.delete_collection(collection_name)
+    print(f"Deleted existing collection: {collection_name}")
+
+
+client.create_collection(
+    collection_name=collection_name,
+    vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+)
+print(f"✅ Collection '{collection_name}' created successfully.")
+                             model = SentenceTransformer('all-MiniLM-L6-v2')  
+
+texts = [
+    "Who is German and likes bread?",
+    "Everyone in Germany.",
+    "French people love baguettes.",
+    "Italy is famous for pizza."
+]
+
+
+embeddings = model.encode(texts, convert_to_numpy=True)                                                                      
+for i, (text, vector) in enumerate(zip(texts, embeddings)):
+    client.upsert(
+        collection_name=collection_name,
+        points=[
+            PointStruct(
+                id=uuid.uuid4().int >> 64,
+                vector=vector.tolist(),
+                payload={"text": text}
+            )
+        ]
+    )
+
+print("✅ Embeddings inserted successfully!")                                                                                             
+query = "Who likes bread in Europe?"
+
+
+query_embedding = model.encode([query], convert_to_numpy=True)[0]
+
+
+results = client.search(
+    collection_name=collection_name,
+    query_vector=query_embedding.tolist(),
+    limit=3
+)
+
+
+print(f"\n🔍 Query: {query}")
+for res in results:
+    print(f"Text: {res.payload['text']} | Score: {res.score:.4f}")  this our project code and we developed an app as import streamlit as st
 import uuid
 import matplotlib.pyplot as plt
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
 
-# --- Page Config ---
+# --- Page Config (Must be first) ---
 st.set_page_config(
     page_title="Semantic Search Demo",
     page_icon="🔍",
@@ -39,10 +96,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Load Model (Lightweight for low RAM) ---
+# --- Load Sentence Transformer Model ---
 @st.cache_resource
 def load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
+    return SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1")
 
 model = load_model()
 
@@ -57,13 +114,13 @@ def init_qdrant():
 
     client.create_collection(
         collection_name=collection_name,
-        vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+        vectors_config=VectorParams(size=1024, distance=Distance.COSINE)
     )
     return client, collection_name
 
 client, collection_name = init_qdrant()
 
-# --- Default Texts ---
+# --- Insert Default Texts ---
 default_texts = [
     "Who is German and likes bread?",
     "Everyone in Germany.",
@@ -85,13 +142,13 @@ def insert_texts(texts):
 
 insert_texts(default_texts)
 
-# --- Sidebar ---
+# --- Sidebar Info ---
 with st.sidebar:
     st.title("⚙ Settings")
     st.markdown("This app uses [Qdrant](https://qdrant.tech) and [Sentence Transformers](https://www.sbert.net/) to perform semantic similarity search.")
     st.markdown("🔄 Add custom documents and search similar texts.")
     st.divider()
-    st.info("Built by Bhavishya")
+    st.info("Built by Bhavishya for SDP Viva")
 
 # --- Main Interface ---
 st.title("🔍 Semantic Search App")
@@ -138,7 +195,7 @@ if query:
         st.caption(f"Similarity: {res.score:.4f}")
         st.markdown("---")
 
-    # --- Visualization ---
+    # --- Chart Visualization ---
     st.markdown("### 📊 Similarity Scores Visualization")
     fig, ax = plt.subplots()
     ax.barh(documents[::-1], similarity_scores[::-1], color="#5dade2")
@@ -147,8 +204,9 @@ if query:
     ax.set_title("Top Matching Documents")
     st.pyplot(fig)
 
-# --- Query History ---
+# --- Query Evolution ---
 if st.session_state.queries:
     with st.expander("🧠 Query History"):
         for q in reversed(st.session_state.queries[-5:]):
             st.write(f"• {q}")
+ so iam writing documentation

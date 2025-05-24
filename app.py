@@ -1,74 +1,52 @@
 import streamlit as st
-from sentence_transformers import SentenceTransformer
-from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance, PointStruct, SearchParams
 import numpy as np
-import matplotlib.pyplot as plt
-import gc
 
-# ------------------------ CONFIG ------------------------ #
-st.set_page_config(page_title="Semantic Search App", layout="wide")
-st.title("🔍 Real-Time Semantic Search (Streamlit + Qdrant)")
-
-# ------------------------ CACHED RESOURCES ------------------------ #
+# --- MEMORY-EFFICIENT MODEL LOAD ---
 @st.cache_resource
 def load_model():
-    return SentenceTransformer("paraphrase-MiniLM-L3-v2")
-
-@st.cache_resource
-def get_qdrant_client():
-    client = QdrantClient(":memory:")  # In-memory DB, no external API
-    client.recreate_collection(
-        collection_name="my_collection",
-        vectors_config=VectorParams(size=384, distance=Distance.COSINE),
-    )
-    return client
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer("all-MiniLM-L6-v2")  # lightweight model
 
 model = load_model()
-qdrant = get_qdrant_client()
 
-# ------------------------ ADD DOCUMENTS ------------------------ #
-st.subheader("📄 Add Your Documents")
-docs = st.text_area("Enter documents (one per line):", height=150)
+# --- SIMULATED DOCUMENT LOADING (Replace with real logic) ---
+@st.cache_data
+def load_my_documents():
+    # Simulate a few short sample docs (TEMP FIX: Limit to 5)
+    return [
+        "Streamlit is an open-source Python app framework for ML and data science.",
+        "Qdrant is a vector similarity search engine written in Rust.",
+        "SentenceTransformers make it easy to compute embeddings.",
+        "Render is a cloud provider for hosting full stack apps.",
+        "Vector search helps you find similar documents semantically.",
+        "This document won't be loaded due to limit."  # gets excluded
+    ][:5]  # Limit number of documents to stay under memory
 
-if st.button("Embed Documents"):
-    if docs.strip():
-        lines = [d.strip() for d in docs.strip().split("\n") if d.strip()]
-        embeddings = model.encode(lines).tolist()
-        points = [PointStruct(id=i, vector=vec, payload={"text": lines[i]}) for i, vec in enumerate(embeddings)]
-        qdrant.upsert(collection_name="my_collection", points=points)
-        st.success("✅ Documents embedded and stored in memory!")
-        gc.collect()
+# --- EMBEDDING FUNCTION ---
+@st.cache_data
+def embed_documents(docs):
+    return model.encode(docs, show_progress_bar=False)
 
-# ------------------------ QUERY SEARCH ------------------------ #
-st.subheader("🔎 Semantic Search")
+# --- APP UI ---
+st.set_page_config(page_title="Semantic Search", layout="centered")
+st.title("🔍 Lightweight Semantic Search App (Render Optimized)")
+
+docs = load_my_documents()
+doc_embeddings = embed_documents(docs)
+
 query = st.text_input("Enter your search query:")
+if query:
+    query_embedding = model.encode([query])[0]
 
-if st.button("Search"):
-    if query.strip():
-        query_embedding = model.encode(query).tolist()
-        hits = qdrant.search(
-            collection_name="my_collection",
-            query_vector=query_embedding,
-            limit=5,
-            search_params=SearchParams(hnsw_ef=64, exact=False)
-        )
+    # Compute cosine similarity
+    scores = np.dot(doc_embeddings, query_embedding) / (
+        np.linalg.norm(doc_embeddings, axis=1) * np.linalg.norm(query_embedding) + 1e-9
+    )
 
-        if hits:
-            st.markdown("### 🔍 Top Matches")
-            for hit in hits:
-                st.markdown(f"**Score:** {hit.score:.4f} — `{hit.payload['text']}`")
-
-            # Optional: show similarity chart
-            st.subheader("📊 Similarity Scores")
-            scores = [hit.score for hit in hits]
-            labels = [f"Doc {i+1}" for i in range(len(hits))]
-            fig, ax = plt.subplots()
-            ax.barh(labels, scores, color="skyblue")
-            ax.invert_yaxis()
-            ax.set_xlabel("Cosine Similarity")
-            st.pyplot(fig)
-
-        else:
-            st.warning("❗ No matches found.")
-        gc.collect()
+    # Show top 3 results
+    top_k = 3
+    top_indices = np.argsort(scores)[::-1][:top_k]
+    st.subheader("Top Matches:")
+    for i in top_indices:
+        st.markdown(f"**Score:** {scores[i]:.2f}")
+        st.write(docs[i])

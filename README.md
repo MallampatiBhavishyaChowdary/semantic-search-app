@@ -76,7 +76,7 @@ pip install -r requirements.txt
 # Run the magic 🧙‍♂️
 streamlit run app.py
 
-🧪 Test It Out!
+##🧪 Test It Out!
 Try adding documents like:
 
 "Who is German and likes bread?"
@@ -87,13 +87,13 @@ Try adding documents like:
 
 "Italy is famous for pizza."
 
-Then search:
+##Then search:
 
 ✨ "Who likes bread in Europe?"
 
 And watch the magic unfold 💫
 
-🌍 Deploy It Like a Pro
+##🌍 Deploy It Like a Pro
 This app works beautifully on:
 
 ☁️ Streamlit Cloud – super fast & free hosting!
@@ -108,7 +108,7 @@ requirements.txt
 
 (Optional) render.yaml
 
-🧾 Requirements
+##🧾 Requirements
 txt
 Copy
 Edit
@@ -120,6 +120,6 @@ torch
 Paste that in requirements.txt ✨
 
 
-Built with love by Mallampati Bhavishya 💙
+##Built with love by Mallampati Bhavishya 💙
 📍 Final Year CSE Student @ VIT-AP
 

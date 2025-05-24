@@ -2,7 +2,7 @@
 
 Welcome to the **smartest way to search** through text using meaning — not just keywords! This app uses **Sentence Transformers**, **Qdrant Vector DB**, and a beautiful **Streamlit UI** to help you find semantically similar documents 🔥
 
----
+
 
 ## 🧠 What Can This App Do?
 
@@ -18,7 +18,7 @@ Enjoy a cute bar chart showing how close your search was to the top results 💙
 🕵️ **Track Your Curiosity**  
 Every query you try is stored so you can peek back at your search history like a detective 🕵️‍♂️
 
----
+
 
 ## 🚀 Tech Behind the Magic
 
@@ -28,7 +28,6 @@ Every query you try is stored so you can peek back at your search history like a
 - 📊 `Matplotlib` – our go-to for visualizing similarity scores  
 - 💬 `Python` – the one ring to glue them all together!
 
----
 
 ## 🕹️ How to Use It (Locally)
 

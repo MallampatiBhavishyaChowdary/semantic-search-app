@@ -1,7 +1,5 @@
 streamlit
-torch==2.0.1
-sentence-transformers==2.2.2
-qdrant-client==1.8.0
-matplotlib==3.7.1
-numpy==1.24.4
-rich==10.14.0
+sentence-transformers
+qdrant-client
+torch
+matplotlib

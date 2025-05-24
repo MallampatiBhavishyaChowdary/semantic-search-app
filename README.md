@@ -58,24 +58,6 @@ Every query you try is stored so you can peek back at your search history like a
 - 📊 `Matplotlib` – our go-to for visualizing similarity scores  
 - 💬 `Python` – the one ring to glue them all together!
 
-
-## 🕹️ How to Use It (Locally)
-
-```bash
-# Clone this magical repo
-git clone https://github.com/your-username/semantic-search-app.git
-cd semantic-search-app
-
-# Start a virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # use venv\Scripts\activate on Windows
-
-# Install the spellbook 🧪
-pip install -r requirements.txt
-
-# Run the magic 🧙‍♂️
-streamlit run app.py
-
 ## 🧪 Test It Out!
 Try adding documents like:
 
@@ -122,4 +104,22 @@ Paste that in requirements.txt ✨
 
 ## Built with love by Mallampati Bhavishya 💙
 📍 Final Year CSE Student @ VIT-AP
+
+## 🕹️ How to Use It (Locally)
+
+```bash
+# Clone this magical repo
+git clone https://github.com/your-username/semantic-search-app.git
+cd semantic-search-app
+
+# Start a virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # use venv\Scripts\activate on Windows
+
+# Install the spellbook 🧪
+pip install -r requirements.txt
+
+# Run the magic 🧙‍♂️
+streamlit run app.py
+
 

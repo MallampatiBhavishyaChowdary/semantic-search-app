@@ -91,14 +91,17 @@ requirements.txt
 (Optional) render.yaml
 
 ## 🧾 Requirements
-txt
-Copy
-Edit
+
 streamlit
+
 sentence-transformers
+
 qdrant-client
+
 matplotlib
+
 torch
+
 Paste that in requirements.txt ✨
 
 
